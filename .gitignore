@@ -1,0 +1,30 @@
+# Python / ambientes virtuais
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Dados locais, logs e configuração sensível
+.env
+.env.*
+!.env.example
+.pgpass
+pgddl.conf
+*.log
+reports/
+views/
+logs/
+*.ddl
+*.sql
+*.dump
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
