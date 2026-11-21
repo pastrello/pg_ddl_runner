@@ -1,0 +1,446 @@
+Uso: pgddl [-h] [--version] COMANDO ...
+
+PG DDL Runner 0.5.1 — executor sequencial de DDL PostgreSQL.
+
+Opções:
+  -h, --help      Mostra esta ajuda e sai.
+  --version       Mostra a versão e sai.
+
+Comandos disponíveis:
+  COMANDO
+    plan          Analisa o arquivo DDL sem conexão ao banco.
+    dry-run       Analisa locks, estrutura e dependências no banco (somente
+                  leitura).
+    status        Consulta o progresso, checkpoints e erros pendentes ou
+                  resolvidos.
+    apply         Aplica ou retoma o DDL na ordem original, com checkpoint por
+                  comando.
+    ack           Reconhece manualmente o próximo passo pendente, sem executar
+                  seu SQL.
+    dependencies  Identifica views dependentes de um ALTER COLUMN TYPE e
+                  exporta backup.
+    report        Gera relatório HTML de execução, tempos, erros e histórico.
+    validate      Confere propriedades estruturais simples dos passos
+                  confirmados.
+
+Fluxo recomendado (teste em clone):
+  ./pgddl plan atualizacao.ddl
+  ./pgddl dry-run atualizacao.ddl -d erp -U postgres -p 15777
+  ./pgddl apply atualizacao.ddl -d erp -U postgres -p 15777 --max-steps 20
+  ./pgddl status atualizacao.ddl -d erp -U postgres -p 15777
+  ./pgddl report atualizacao.ddl -d erp -U postgres -p 15777 --validate
+
+Para ver opções, valores padrão e exemplos de um comando:
+  ./pgddl apply -h
+  ./pgddl <comando> -h
+
+Códigos de saída:
+  0   Sucesso ou pausa programada; consulte status.
+  1   Falha de preparação, controle ou conexão (fora do DDL).
+  2   Erro de argumentos (CLI) ou falha durante DDL/checkpoint.
+  3   Pausa após WARNING; passo já confirmado.
+  4   Alertas no dry-run, materialized view em dependencies ou divergência na validação.
+  130 Interrupção por Ctrl+C; consulte status antes de retomar.
+
+Segurança: apply modifica o banco; ack modifica o histórico. Não há rollback
+global. Use o mesmo arquivo original na retomada e preserve o histórico.
+
+========== plan ==========
+
+Uso: pgddl plan [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                  [--full]
+                  ARQUIVO.ddl
+
+Analisa o arquivo DDL sem conexão ao banco.
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+  --full                Lista uma prévia de cada comando (até 180 caracteres),
+                        além do resumo.
+
+Lista famílias de comandos e SHA-256; não valida toda a sintaxe SQL.
+Exemplo: ./pgddl plan atualizacao.ddl --full
+
+========== dry-run ==========
+
+Uso: pgddl dry-run [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                     -d BANCO [-H HOST] [-p PORTA] [-U USUARIO]
+                     [--schema SCHEMA] [--migration-id ID]
+                     [--lock-timeout SEG] [--statement-timeout SEG]
+                     [--log ARQUIVO] [--verbose] [--locks-only]
+                     [--max-steps N]
+                     ARQUIVO.ddl
+
+Analisa locks, estrutura e dependências no banco (somente leitura).
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+
+Conexão e identidade da migração:
+  -d, --dbname BANCO    Nome literal do banco, obrigatório (não URI/conninfo).
+  -H, --host HOST       Host ou diretório do socket; quando omitido, usa
+                        padrão libpq/PGHOST.
+  -p, --port PORTA      Porta PostgreSQL; quando omitida, usa padrão
+                        libpq/PGPORT.
+  -U, --user USUARIO    Papel PostgreSQL; quando omitido, usa padrão
+                        libpq/PGUSER.
+  --schema SCHEMA       Schema alvo e search_path (padrão: public).
+  --migration-id ID     ID estável da atualização (padrão: nome do arquivo).
+                        Preserve na retomada.
+
+Timeouts e log:
+  --lock-timeout SEG    Limite por aquisição de lock (padrão: 3 s); 0 sem
+                        limite, não recomendado.
+  --statement-timeout SEG
+                        Limite por instrução (padrão: 0, sem limite).
+  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
+                        XDG_STATE_HOME).
+
+Opções de dry-run:
+  --verbose             Mostra todos os passos analisados, não somente
+                        alertas/resumo.
+  --locks-only          Analisa locks sem a análise estrutural e de
+                        dependências adicional.
+  --max-steps N         Limita passos pendentes analisados (padrão: 0, todos).
+
+Não aplica DDL nem cria histórico. Os locks observados podem mudar.
+Exemplo: ./pgddl dry-run atualizacao.ddl -d erp -U postgres -p 15777 --verbose
+
+========== status ==========
+
+Uso: pgddl status [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                    -d BANCO [-H HOST] [-p PORTA] [-U USUARIO]
+                    [--schema SCHEMA] [--migration-id ID] [--lock-timeout SEG]
+                    [--statement-timeout SEG] [--log ARQUIVO] [--history]
+                    [--migrations]
+                    ARQUIVO.ddl
+
+Consulta o progresso, checkpoints e erros pendentes ou resolvidos.
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+
+Conexão e identidade da migração:
+  -d, --dbname BANCO    Nome literal do banco, obrigatório (não URI/conninfo).
+  -H, --host HOST       Host ou diretório do socket; quando omitido, usa
+                        padrão libpq/PGHOST.
+  -p, --port PORTA      Porta PostgreSQL; quando omitida, usa padrão
+                        libpq/PGPORT.
+  -U, --user USUARIO    Papel PostgreSQL; quando omitido, usa padrão
+                        libpq/PGUSER.
+  --schema SCHEMA       Schema alvo e search_path (padrão: public).
+  --migration-id ID     ID estável da atualização (padrão: nome do arquivo).
+                        Preserve na retomada.
+
+Timeouts e log:
+  --lock-timeout SEG    Limite por aquisição de lock (padrão: 3 s); 0 sem
+                        limite, não recomendado.
+  --statement-timeout SEG
+                        Limite por instrução (padrão: 0, sem limite).
+  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
+                        XDG_STATE_HOME).
+
+Opções de status:
+  --history             Exibe todas as falhas, inclusive resolvidas e
+                        reconhecidas.
+  --migrations          Lista as migrações do banco/schema selecionado.
+
+Somente leitura no banco. Pode ser usado durante apply.
+Exemplo: ./pgddl status atualizacao.ddl -d erp -U postgres -p 15777 --history --migrations
+
+========== apply ==========
+
+Uso: pgddl apply [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                   -d BANCO [-H HOST] [-p PORTA] [-U USUARIO]
+                   [--schema SCHEMA] [--migration-id ID] [--lock-timeout SEG]
+                   [--statement-timeout SEG] [--log ARQUIVO]
+                   [--backup-dir DIRETORIO]
+                   [--dependency-policy {stop,rebuild-views}]
+                   [--lock-policy {nowait,wait,retry}] [--retry-interval SEG]
+                   [--retry-timeout SEG] [--monitor-interval SEG] [--yes]
+                   [--verbose] [--max-steps N] [--continue-on-warning]
+                   [--parallel-maintenance-workers N]
+                   [--maintenance-work-mem MEMORIA]
+                   ARQUIVO.ddl
+
+Aplica ou retoma o DDL na ordem original, com checkpoint por comando.
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+
+Conexão e identidade da migração:
+  -d, --dbname BANCO    Nome literal do banco, obrigatório (não URI/conninfo).
+  -H, --host HOST       Host ou diretório do socket; quando omitido, usa
+                        padrão libpq/PGHOST.
+  -p, --port PORTA      Porta PostgreSQL; quando omitida, usa padrão
+                        libpq/PGPORT.
+  -U, --user USUARIO    Papel PostgreSQL; quando omitido, usa padrão
+                        libpq/PGUSER.
+  --schema SCHEMA       Schema alvo e search_path (padrão: public).
+  --migration-id ID     ID estável da atualização (padrão: nome do arquivo).
+                        Preserve na retomada.
+
+Timeouts e log:
+  --lock-timeout SEG    Limite por aquisição de lock (padrão: 3 s); 0 sem
+                        limite, não recomendado.
+  --statement-timeout SEG
+                        Limite por instrução (padrão: 0, sem limite).
+  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
+                        XDG_STATE_HOME).
+
+Opções de apply:
+  --backup-dir DIRETORIO
+                        Histórico das views (padrão:
+                        ~/.local/state/pgddl/views ou XDG_STATE_HOME).
+  --dependency-policy {stop,rebuild-views}
+                        stop: exporta e pausa (padrão); rebuild-views:
+                        reconstrói apenas views comuns suportadas, em
+                        transação.
+  --lock-policy {nowait,wait,retry}
+                        nowait: pré-lock imediato (padrão); wait: fila com
+                        timeout; retry: repete pré-lock sem permanecer na
+                        fila.
+  --retry-interval SEG  Intervalo entre tentativas do pré-lock (padrão: 5 s,
+                        só retry).
+  --retry-timeout SEG   Janela de novas tentativas por passo (padrão: 300 s,
+                        só retry).
+  --monitor-interval SEG
+                        Intervalo do monitor de locks/índices (padrão: 2 s); 0
+                        desativa.
+  --yes                 Dispensa confirmação do nome do banco, inclusive em
+                        automação. Não ignora erros.
+  --verbose             Exibe SQL integral de cada passo durante a execução.
+  --max-steps N         Pausa após N novos comandos confirmados (padrão: 0,
+                        sem limite).
+  --continue-on-warning
+                        Continua após WARNING; por padrão pausa após confirmar
+                        o passo. Não ignora erros SQL.
+  --parallel-maintenance-workers, --max-parallel-maintenance-workers N
+                        Limite de workers nativos de manutenção nesta sessão;
+                        0 desativa. Omitir preserva configuração.
+  --maintenance-work-mem MEMORIA
+                        Memória de manutenção da sessão, ex.: 512MB. Unidades
+                        kB, MB ou GB. Omitir preserva configuração.
+
+ALTERA O BANCO. Revise o SQL, faça backup e teste em clone.
+Retome com o mesmo arquivo, schema, papel e ID; não edite o arquivo.
+Exemplos:
+  ./pgddl apply atualizacao.ddl -d erp -U postgres -p 15777 --max-steps 20
+  ./pgddl apply atualizacao.ddl -d erp -U postgres -p 15777 --lock-policy retry
+  ./pgddl apply atualizacao.ddl -d erp -U postgres -p 15777 --dependency-policy rebuild-views
+Materialized views bloqueiam a reconstrução automática, mesmo quando autorizada.
+
+========== ack ==========
+
+Uso: pgddl ack [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                 -d BANCO [-H HOST] [-p PORTA] [-U USUARIO] [--schema SCHEMA]
+                 [--migration-id ID] [--lock-timeout SEG]
+                 [--statement-timeout SEG] [--log ARQUIVO] --step N
+                 --reason MOTIVO [--yes]
+                 ARQUIVO.ddl
+
+Reconhece manualmente o próximo passo pendente, sem executar seu SQL.
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+
+Conexão e identidade da migração:
+  -d, --dbname BANCO    Nome literal do banco, obrigatório (não URI/conninfo).
+  -H, --host HOST       Host ou diretório do socket; quando omitido, usa
+                        padrão libpq/PGHOST.
+  -p, --port PORTA      Porta PostgreSQL; quando omitida, usa padrão
+                        libpq/PGPORT.
+  -U, --user USUARIO    Papel PostgreSQL; quando omitido, usa padrão
+                        libpq/PGUSER.
+  --schema SCHEMA       Schema alvo e search_path (padrão: public).
+  --migration-id ID     ID estável da atualização (padrão: nome do arquivo).
+                        Preserve na retomada.
+
+Timeouts e log:
+  --lock-timeout SEG    Limite por aquisição de lock (padrão: 3 s); 0 sem
+                        limite, não recomendado.
+  --statement-timeout SEG
+                        Limite por instrução (padrão: 0, sem limite).
+  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
+                        XDG_STATE_HOME).
+
+Opções de ack:
+  --step N              Número do próximo passo pendente, obrigatório.
+  --reason MOTIVO       Justificativa não vazia e evidência da verificação,
+                        obrigatória.
+  --yes                 Confirma expressamente o reconhecimento manual
+                        (obrigatório).
+
+ALTERA O HISTÓRICO. Só use após verificar o efeito exato do DDL.
+Exige --step, --reason e --yes. Não valida equivalência automaticamente.
+Exemplo (número ilustrativo):
+  ./pgddl ack atualizacao.ddl -d erp -U postgres -p 15777 --step 20 --reason "Efeito verificado" --yes
+
+========== dependencies ==========
+
+Uso: pgddl dependencies [-h]
+                          [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                          -d BANCO [-H HOST] [-p PORTA] [-U USUARIO]
+                          [--schema SCHEMA] [--migration-id ID]
+                          [--lock-timeout SEG] [--statement-timeout SEG]
+                          [--log ARQUIVO] [--backup-dir DIRETORIO] --step N
+                          ARQUIVO.ddl
+
+Identifica views dependentes de um ALTER COLUMN TYPE e exporta backup.
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+
+Conexão e identidade da migração:
+  -d, --dbname BANCO    Nome literal do banco, obrigatório (não URI/conninfo).
+  -H, --host HOST       Host ou diretório do socket; quando omitido, usa
+                        padrão libpq/PGHOST.
+  -p, --port PORTA      Porta PostgreSQL; quando omitida, usa padrão
+                        libpq/PGPORT.
+  -U, --user USUARIO    Papel PostgreSQL; quando omitido, usa padrão
+                        libpq/PGUSER.
+  --schema SCHEMA       Schema alvo e search_path (padrão: public).
+  --migration-id ID     ID estável da atualização (padrão: nome do arquivo).
+                        Preserve na retomada.
+
+Timeouts e log:
+  --lock-timeout SEG    Limite por aquisição de lock (padrão: 3 s); 0 sem
+                        limite, não recomendado.
+  --statement-timeout SEG
+                        Limite por instrução (padrão: 0, sem limite).
+  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
+                        XDG_STATE_HOME).
+
+Opções de dependencies:
+  --backup-dir DIRETORIO
+                        Histórico das views (padrão:
+                        ~/.local/state/pgddl/views ou XDG_STATE_HOME).
+  --step N              Número do passo ALTER COLUMN TYPE (obrigatório, começa
+                        em 1).
+
+Somente leitura no banco; grava arquivos locais. Não reconstrói views.
+MATERIALIZED VIEW recebe destaque; backup é estrutural, não dos dados.
+Exemplo: ./pgddl dependencies atualizacao.ddl -d erp -U postgres -p 15777 --step 20
+
+========== report ==========
+
+Uso: pgddl report [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                    -d BANCO [-H HOST] [-p PORTA] [-U USUARIO]
+                    [--schema SCHEMA] [--migration-id ID] [--lock-timeout SEG]
+                    [--statement-timeout SEG] [--log ARQUIVO]
+                    [--report-dir DIRETORIO] [--validate]
+                    ARQUIVO.ddl
+
+Gera relatório HTML de execução, tempos, erros e histórico.
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+
+Conexão e identidade da migração:
+  -d, --dbname BANCO    Nome literal do banco, obrigatório (não URI/conninfo).
+  -H, --host HOST       Host ou diretório do socket; quando omitido, usa
+                        padrão libpq/PGHOST.
+  -p, --port PORTA      Porta PostgreSQL; quando omitida, usa padrão
+                        libpq/PGPORT.
+  -U, --user USUARIO    Papel PostgreSQL; quando omitido, usa padrão
+                        libpq/PGUSER.
+  --schema SCHEMA       Schema alvo e search_path (padrão: public).
+  --migration-id ID     ID estável da atualização (padrão: nome do arquivo).
+                        Preserve na retomada.
+
+Timeouts e log:
+  --lock-timeout SEG    Limite por aquisição de lock (padrão: 3 s); 0 sem
+                        limite, não recomendado.
+  --statement-timeout SEG
+                        Limite por instrução (padrão: 0, sem limite).
+  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
+                        XDG_STATE_HOME).
+
+Opções de report:
+  --report-dir DIRETORIO
+                        Destino HTML (padrão: ~/.local/state/pgddl/reports ou
+                        XDG_STATE_HOME).
+  --validate            Inclui verificação estrutural limitada no relatório.
+
+Somente leitura no banco; grava HTML local com metadados e SQL.
+Exemplo: ./pgddl report atualizacao.ddl -d erp -U postgres -p 15777 --validate
+
+========== validate ==========
+
+Uso: pgddl validate [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
+                      -d BANCO [-H HOST] [-p PORTA] [-U USUARIO]
+                      [--schema SCHEMA] [--migration-id ID]
+                      [--lock-timeout SEG] [--statement-timeout SEG]
+                      [--log ARQUIVO] [--verbose]
+                      ARQUIVO.ddl
+
+Confere propriedades estruturais simples dos passos confirmados.
+
+Argumentos posicionais:
+  ARQUIVO.ddl           Arquivo DDL original da desenvolvedora.
+
+Opções:
+  -h, --help            Mostra esta ajuda e sai.
+  --encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}
+                        Codificação do arquivo (padrão: auto).
+
+Conexão e identidade da migração:
+  -d, --dbname BANCO    Nome literal do banco, obrigatório (não URI/conninfo).
+  -H, --host HOST       Host ou diretório do socket; quando omitido, usa
+                        padrão libpq/PGHOST.
+  -p, --port PORTA      Porta PostgreSQL; quando omitida, usa padrão
+                        libpq/PGPORT.
+  -U, --user USUARIO    Papel PostgreSQL; quando omitido, usa padrão
+                        libpq/PGUSER.
+  --schema SCHEMA       Schema alvo e search_path (padrão: public).
+  --migration-id ID     ID estável da atualização (padrão: nome do arquivo).
+                        Preserve na retomada.
+
+Timeouts e log:
+  --lock-timeout SEG    Limite por aquisição de lock (padrão: 3 s); 0 sem
+                        limite, não recomendado.
+  --statement-timeout SEG
+                        Limite por instrução (padrão: 0, sem limite).
+  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
+                        XDG_STATE_HOME).
+
+Opções de validate:
+  --verbose             Mostra também as verificações com resultado OK.
+
+Somente leitura. Não certifica dados, permissões ou equivalência de views.
+Exemplo: ./pgddl validate atualizacao.ddl -d erp -U postgres -p 15777 --verbose
