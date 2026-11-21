@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import platform_paths
 import logging
 
 LOG = logging.getLogger('pgddl')
@@ -149,10 +150,10 @@ def statements(conn, n):
 
 
 def write_backup(conn, nodes, edges, args, step, manifest, reason=None):
-    root=Path(args.backup_dir or (Path(os.environ.get('XDG_STATE_HOME',str(Path.home()/'.local/state')))/'pgddl'/'views'))
+    root=Path(args.backup_dir or (platform_paths.state_root()/'views'))
     root.mkdir(mode=0o700,parents=True,exist_ok=True)
     stamp=datetime.datetime.now().astimezone()
-    directory=Path(tempfile.mkdtemp(prefix=stamp.strftime('%d-%m-%Y_%H:%M')+f'_step-{step.number:04d}_',dir=root))
+    directory=Path(tempfile.mkdtemp(prefix=platform_paths.timestamp_part(stamp)+f'_step-{step.number:04d}_',dir=root))
     def save(name,content):
         with os.fdopen(os.open(directory/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600),'w',encoding='utf-8') as f:
             f.write(content); f.flush(); os.fsync(f.fileno())
@@ -165,11 +166,10 @@ def write_backup(conn, nodes, edges, args, step, manifest, reason=None):
         for n in nodes: script.extend(c.as_string(conn)+';' for c in statements(conn,n))
         script.append('COMMIT;')
         save('restore-views.sql','\n'.join(script)+'\n')
-    # Persist directory entries before any DROP.
+    # POSIX: fsync directory entries before DROP; Windows does not support
+    # os.O_DIRECTORY/dir fsync via Python. File contents were flushed above.
     for p in (directory,root):
-        fd=os.open(p,os.O_RDONLY|os.O_DIRECTORY)
-        try: os.fsync(fd)
-        finally: os.close(fd)
+        platform_paths.sync_directory(p)
     LOG.info('BACKUP DE VIEWS: %s',directory)
     return str(directory)
 

@@ -1,4 +1,5 @@
 import logging
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,7 +40,8 @@ class AuditTests(unittest.TestCase):
         self.assertNotIn('<script>',content);self.assertIn('&lt;script&gt;',content);self.assertIn('&lt;b&gt;',content)
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(audit.write_report(content,tmp));q=Path(audit.write_report(content,tmp));self.assertNotEqual(p,q)
-            self.assertEqual(p.stat().st_mode & 0o777,0o600);self.assertEqual(p.read_text(),content)
+            if os.name != 'nt': self.assertEqual(p.stat().st_mode & 0o777,0o600)
+            self.assertEqual(p.read_text(),content)
     def test_session_settings(self):
         conn=Mock();conn.execute.return_value.fetchall.return_value=[('maintenance_work_mem','512MB')]
         args=SimpleNamespace(parallel_maintenance_workers=4,maintenance_work_mem='512MB')

@@ -15,6 +15,7 @@ import time
 import threading
 import viewdeps
 import audit
+import platform_paths
 
 VERSION = '0.5.1'
 HISTORY = '_pgddl_runner'
@@ -747,6 +748,9 @@ Para ver opções, valores padrão e exemplos de um comando:
   ./pgddl apply -h
   ./pgddl <comando> -h
 
+Windows: use .\\pgddl.cmd no lugar de ./pgddl; conexão via TCP
+normalmente exige -H HOST e credenciais libpq/pgpass.conf.
+
 Códigos de saída:
   0   Sucesso ou pausa programada; consulte status.
   1   Falha de preparação, controle ou conexão (fora do DDL).
@@ -778,13 +782,13 @@ global. Use o mesmo arquivo original na retomada e preserve o histórico.
         g = p.add_argument_group('Timeouts e log')
         g.add_argument('--lock-timeout',type=int,default=3,metavar='SEG',help='Limite por aquisição de lock (padrão: 3 s); 0 sem limite, não recomendado.')
         g.add_argument('--statement-timeout',type=int,default=0,metavar='SEG',help='Limite por instrução (padrão: 0, sem limite).')
-        g.add_argument('--log',default=None,metavar='ARQUIVO',help='Log local (padrão: ~/.local/state/pgddl/logs ou XDG_STATE_HOME).')
+        g.add_argument('--log',default=None,metavar='ARQUIVO',help='Log local (Windows: %%LOCALAPPDATA%%\\PGDDL\\logs; Linux: ~/.local/state/pgddl/logs; PGDDL_STATE_HOME personaliza).')
         g = p.add_argument_group('Opções de '+cmd)
         if cmd=='status':
             g.add_argument('--history',action='store_true',help='Exibe todas as falhas, inclusive resolvidas e reconhecidas.')
             g.add_argument('--migrations',action='store_true',help='Lista as migrações do banco/schema selecionado.')
         if cmd=='report':
-            g.add_argument('--report-dir',type=Path,metavar='DIRETORIO',help='Destino HTML (padrão: ~/.local/state/pgddl/reports ou XDG_STATE_HOME).')
+            g.add_argument('--report-dir',type=Path,metavar='DIRETORIO',help='Destino HTML (Windows: LOCALAPPDATA/PGDDL/reports; Linux: ~/.local/state/pgddl/reports).')
             g.add_argument('--validate',action='store_true',help='Inclui verificação estrutural limitada no relatório.')
         if cmd=='validate': g.add_argument('--verbose',action='store_true',help='Mostra também as verificações com resultado OK.')
         if cmd=='dry-run':
@@ -792,7 +796,7 @@ global. Use o mesmo arquivo original na retomada e preserve o histórico.
             g.add_argument('--locks-only',action='store_true',help='Analisa locks sem a análise estrutural e de dependências adicional.')
             g.add_argument('--max-steps',type=int,default=0,metavar='N',help='Limita passos pendentes analisados (padrão: 0, todos).')
         if cmd in ('apply','dependencies'):
-            g.add_argument('--backup-dir',type=Path,metavar='DIRETORIO',help='Histórico das views (padrão: ~/.local/state/pgddl/views ou XDG_STATE_HOME).')
+            g.add_argument('--backup-dir',type=Path,metavar='DIRETORIO',help='Histórico das views (Windows: LOCALAPPDATA/PGDDL/views; Linux: ~/.local/state/pgddl/views).')
         if cmd=='dependencies': g.add_argument('--step',type=int,required=True,metavar='N',help='Número do passo ALTER COLUMN TYPE (obrigatório, começa em 1).')
         if cmd=='apply':
             g.add_argument('--dependency-policy',choices=['stop','rebuild-views'],default='stop',help='stop: exporta e pausa (padrão); rebuild-views: reconstrói apenas views comuns suportadas, em transação.')
@@ -830,7 +834,7 @@ def main(argv=None):
         if '=' in args.dbname or args.dbname.startswith(('postgresql://','postgres://')):
             raise RunnerError('Use o nome literal do banco; configure conexão por PGHOST/PGPORT/PGUSER/.pgpass.')
         if not args.log:
-            directory = Path(os.environ.get('XDG_STATE_HOME', str(Path.home()/'.local/state')))/'pgddl'/'logs'
+            directory = platform_paths.state_root()/'logs'
             directory.mkdir(mode=0o700,parents=True,exist_ok=True)
             args.log = directory / (datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')+f'-{args.command}-{os.getpid()}.log')
         setup_logging(args.log)

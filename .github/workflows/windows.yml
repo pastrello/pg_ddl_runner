@@ -1,0 +1,46 @@
+# Manual to avoid consuming GitHub Actions minutes on every documentation edit.
+name: Windows - testes e EXE
+on:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Instalar pelo instalador Windows
+        shell: cmd
+        run: call install-windows.cmd
+      - name: Testes unitarios offline
+        shell: cmd
+        run: .venv\Scripts\python.exe -m unittest discover -p "test_*.py" -v
+      - name: Smoke test do launcher
+        shell: pwsh
+        run: |
+          Set-Content -Path sample.ddl -Value 'CREATE TABLE demo_win (id integer);' -Encoding ascii
+          & .\pgddl.cmd --version
+          & .\pgddl.cmd -h
+          & .\pgddl.cmd plan sample.ddl
+          if ($LASTEXITCODE -ne 0) { throw 'Falha em plan offline' }
+      - name: Compilar executavel autossuficiente no Windows
+        shell: cmd
+        run: |
+          .venv\Scripts\python.exe -m pip install --disable-pip-version-check "pyinstaller>=6,<7"
+          .venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onefile --name pgddl --collect-all psycopg_binary --collect-all psycopg pgddl.py
+      - name: Smoke test do EXE
+        shell: pwsh
+        run: |
+          & .\dist\pgddl.exe --version
+          & .\dist\pgddl.exe plan sample.ddl
+          if ($LASTEXITCODE -ne 0) { throw 'Falha em plan offline no executavel' }
+      - name: Artefato do executavel
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgddl-windows-x64
+          path: dist/pgddl.exe
+          if-no-files-found: error

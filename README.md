@@ -2,6 +2,20 @@
 
 Executor de arquivos DDL recorrentes do fornecedor do ERP para PostgreSQL. Mantém a ordem original, confirma cada comando separadamente e registra seu checkpoint no mesmo banco e na mesma transação. Não substitui backup, revisão do SQL, teste em clone ou janela de manutenção. Não oferece rollback global nem modifica o arquivo do fornecedor.
 
+## Windows — distribuição compatível 0.5.1
+
+O mesmo núcleo agora funciona no Windows via `install-windows.cmd` e `pgddl.cmd`, usando Python 3.10+ x64 e psycopg[binary]. O instalador cria `.venv` local. Mantém o manifesto, os checkpoints, a ordem original e a proteção de views; apenas os caminhos, nomes de arquivos e operações de sincronização de diretório dependentes de Unix foram adaptados.
+
+```powershell
+.\install-windows.cmd
+.\pgddl.cmd --version
+.\pgddl.cmd -h
+.\pgddl.cmd plan "C:\dados\atualizacao.ddl"
+.\pgddl.cmd status "C:\dados\atualizacao.ddl" -H 10.10.10.20 -p 15777 -d erp -U postgres
+```
+
+No Windows, logs, backups e relatórios ficam em `%LOCALAPPDATA%\PGDDL\`, podendo ser alterados com `PGDDL_STATE_HOME`. O Windows deve usar conexão TCP e autenticação autorizada no servidor; o comportamento de socket Unix/peer do Linux não se aplica. Consulte [WINDOWS.md](WINDOWS.md) para instalação, pgpass.conf, caminhos, testes, segurança e compilação opcional do executável via GitHub Actions. **A integração PostgreSQL partindo de host Windows permanece pendente.** A versão 0.5.2 proposta para relatório automático/configuração não foi implementada aqui.
+
 ## Novidades 0.5.1 — ajuda da linha de comando
 
 Ajuda geral e de todos os oito subcomandos reorganizada em português, com descrição, parâmetros, valores padrão, exemplos, códigos de saída e alertas de segurança. Nenhuma mudança na execução, nos argumentos aceitos, valores padrão, manifesto ou schema de controle. O cabeçalho do relatório acompanha a versão. Use `./pgddl -h` e `./pgddl apply -h` (ou outro subcomando). A ajuda não conecta ao banco nem precisa de um arquivo DDL.

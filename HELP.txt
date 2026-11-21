@@ -34,6 +34,9 @@ Para ver opções, valores padrão e exemplos de um comando:
   ./pgddl apply -h
   ./pgddl <comando> -h
 
+Windows: use .\pgddl.cmd no lugar de ./pgddl; conexão via TCP
+normalmente exige -H HOST e credenciais libpq/pgpass.conf.
+
 Códigos de saída:
   0   Sucesso ou pausa programada; consulte status.
   1   Falha de preparação, controle ou conexão (fora do DDL).
@@ -44,6 +47,7 @@ Códigos de saída:
 
 Segurança: apply modifica o banco; ack modifica o histórico. Não há rollback
 global. Use o mesmo arquivo original na retomada e preserve o histórico.
+
 
 ========== plan ==========
 
@@ -65,6 +69,7 @@ Opções:
 
 Lista famílias de comandos e SHA-256; não valida toda a sintaxe SQL.
 Exemplo: ./pgddl plan atualizacao.ddl --full
+
 
 ========== dry-run ==========
 
@@ -103,8 +108,9 @@ Timeouts e log:
                         limite, não recomendado.
   --statement-timeout SEG
                         Limite por instrução (padrão: 0, sem limite).
-  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
-                        XDG_STATE_HOME).
+  --log ARQUIVO         Log local (Windows: %LOCALAPPDATA%\PGDDL\logs; Linux:
+                        ~/.local/state/pgddl/logs; PGDDL_STATE_HOME
+                        personaliza).
 
 Opções de dry-run:
   --verbose             Mostra todos os passos analisados, não somente
@@ -115,6 +121,7 @@ Opções de dry-run:
 
 Não aplica DDL nem cria histórico. Os locks observados podem mudar.
 Exemplo: ./pgddl dry-run atualizacao.ddl -d erp -U postgres -p 15777 --verbose
+
 
 ========== status ==========
 
@@ -152,8 +159,9 @@ Timeouts e log:
                         limite, não recomendado.
   --statement-timeout SEG
                         Limite por instrução (padrão: 0, sem limite).
-  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
-                        XDG_STATE_HOME).
+  --log ARQUIVO         Log local (Windows: %LOCALAPPDATA%\PGDDL\logs; Linux:
+                        ~/.local/state/pgddl/logs; PGDDL_STATE_HOME
+                        personaliza).
 
 Opções de status:
   --history             Exibe todas as falhas, inclusive resolvidas e
@@ -162,6 +170,7 @@ Opções de status:
 
 Somente leitura no banco. Pode ser usado durante apply.
 Exemplo: ./pgddl status atualizacao.ddl -d erp -U postgres -p 15777 --history --migrations
+
 
 ========== apply ==========
 
@@ -205,13 +214,15 @@ Timeouts e log:
                         limite, não recomendado.
   --statement-timeout SEG
                         Limite por instrução (padrão: 0, sem limite).
-  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
-                        XDG_STATE_HOME).
+  --log ARQUIVO         Log local (Windows: %LOCALAPPDATA%\PGDDL\logs; Linux:
+                        ~/.local/state/pgddl/logs; PGDDL_STATE_HOME
+                        personaliza).
 
 Opções de apply:
   --backup-dir DIRETORIO
-                        Histórico das views (padrão:
-                        ~/.local/state/pgddl/views ou XDG_STATE_HOME).
+                        Histórico das views (Windows:
+                        LOCALAPPDATA/PGDDL/views; Linux:
+                        ~/.local/state/pgddl/views).
   --dependency-policy {stop,rebuild-views}
                         stop: exporta e pausa (padrão); rebuild-views:
                         reconstrói apenas views comuns suportadas, em
@@ -250,6 +261,7 @@ Exemplos:
   ./pgddl apply atualizacao.ddl -d erp -U postgres -p 15777 --dependency-policy rebuild-views
 Materialized views bloqueiam a reconstrução automática, mesmo quando autorizada.
 
+
 ========== ack ==========
 
 Uso: pgddl ack [-h] [--encoding {auto,utf-8,utf-8-sig,cp1252,latin-1}]
@@ -286,8 +298,9 @@ Timeouts e log:
                         limite, não recomendado.
   --statement-timeout SEG
                         Limite por instrução (padrão: 0, sem limite).
-  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
-                        XDG_STATE_HOME).
+  --log ARQUIVO         Log local (Windows: %LOCALAPPDATA%\PGDDL\logs; Linux:
+                        ~/.local/state/pgddl/logs; PGDDL_STATE_HOME
+                        personaliza).
 
 Opções de ack:
   --step N              Número do próximo passo pendente, obrigatório.
@@ -300,6 +313,7 @@ ALTERA O HISTÓRICO. Só use após verificar o efeito exato do DDL.
 Exige --step, --reason e --yes. Não valida equivalência automaticamente.
 Exemplo (número ilustrativo):
   ./pgddl ack atualizacao.ddl -d erp -U postgres -p 15777 --step 20 --reason "Efeito verificado" --yes
+
 
 ========== dependencies ==========
 
@@ -338,19 +352,22 @@ Timeouts e log:
                         limite, não recomendado.
   --statement-timeout SEG
                         Limite por instrução (padrão: 0, sem limite).
-  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
-                        XDG_STATE_HOME).
+  --log ARQUIVO         Log local (Windows: %LOCALAPPDATA%\PGDDL\logs; Linux:
+                        ~/.local/state/pgddl/logs; PGDDL_STATE_HOME
+                        personaliza).
 
 Opções de dependencies:
   --backup-dir DIRETORIO
-                        Histórico das views (padrão:
-                        ~/.local/state/pgddl/views ou XDG_STATE_HOME).
+                        Histórico das views (Windows:
+                        LOCALAPPDATA/PGDDL/views; Linux:
+                        ~/.local/state/pgddl/views).
   --step N              Número do passo ALTER COLUMN TYPE (obrigatório, começa
                         em 1).
 
 Somente leitura no banco; grava arquivos locais. Não reconstrói views.
 MATERIALIZED VIEW recebe destaque; backup é estrutural, não dos dados.
 Exemplo: ./pgddl dependencies atualizacao.ddl -d erp -U postgres -p 15777 --step 20
+
 
 ========== report ==========
 
@@ -388,17 +405,19 @@ Timeouts e log:
                         limite, não recomendado.
   --statement-timeout SEG
                         Limite por instrução (padrão: 0, sem limite).
-  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
-                        XDG_STATE_HOME).
+  --log ARQUIVO         Log local (Windows: %LOCALAPPDATA%\PGDDL\logs; Linux:
+                        ~/.local/state/pgddl/logs; PGDDL_STATE_HOME
+                        personaliza).
 
 Opções de report:
   --report-dir DIRETORIO
-                        Destino HTML (padrão: ~/.local/state/pgddl/reports ou
-                        XDG_STATE_HOME).
+                        Destino HTML (Windows: LOCALAPPDATA/PGDDL/reports;
+                        Linux: ~/.local/state/pgddl/reports).
   --validate            Inclui verificação estrutural limitada no relatório.
 
 Somente leitura no banco; grava HTML local com metadados e SQL.
 Exemplo: ./pgddl report atualizacao.ddl -d erp -U postgres -p 15777 --validate
+
 
 ========== validate ==========
 
@@ -436,8 +455,9 @@ Timeouts e log:
                         limite, não recomendado.
   --statement-timeout SEG
                         Limite por instrução (padrão: 0, sem limite).
-  --log ARQUIVO         Log local (padrão: ~/.local/state/pgddl/logs ou
-                        XDG_STATE_HOME).
+  --log ARQUIVO         Log local (Windows: %LOCALAPPDATA%\PGDDL\logs; Linux:
+                        ~/.local/state/pgddl/logs; PGDDL_STATE_HOME
+                        personaliza).
 
 Opções de validate:
   --verbose             Mostra também as verificações com resultado OK.

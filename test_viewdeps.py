@@ -4,6 +4,7 @@ import sys
 import tempfile
 from pathlib import Path
 import json
+import os
 import types
 import viewdeps
 
@@ -32,10 +33,10 @@ class ViewDependencyTests(unittest.TestCase):
             manifest=types.SimpleNamespace(digest='hash')
             nodes=[{'kind':'m','issues':['MATERIALIZED VIEW'],'definition':'SELECT 1','indexes':['CREATE INDEX ...'],'populated':True}]
             a=Path(viewdeps.write_backup(None,nodes,[],args,step,manifest)); b=Path(viewdeps.write_backup(None,nodes,[],args,step,manifest))
-            self.assertNotEqual(a,b); self.assertRegex(a.name,r'^\d\d-\d\d-\d{4}_\d\d:\d\d_step-0020_')
+            self.assertNotEqual(a,b); self.assertRegex(a.name,r'^\d\d-\d\d-\d{4}_\d\d[:\-]\d\d_step-0020_')
             self.assertTrue((a/'LEIA-ME.txt').exists()); self.assertFalse((a/'restore-views.sql').exists())
             self.assertEqual(json.loads((a/'views.json').read_text())['views'][0]['kind'],'m')
-            self.assertEqual((a/'views.json').stat().st_mode&0o777,0o600)
+            if os.name != 'nt': self.assertEqual((a/'views.json').stat().st_mode&0o777,0o600)
 
     def test_rebuild_no_recursive_lock_and_backup_before_drop(self):
         conn=Mock()

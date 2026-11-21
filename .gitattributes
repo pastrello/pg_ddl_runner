@@ -1,0 +1,6 @@
+*.cmd text eol=crlf
+*.sh text eol=lf
+pgddl text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf

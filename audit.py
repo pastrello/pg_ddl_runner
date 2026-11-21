@@ -5,6 +5,7 @@ import html
 import os
 from pathlib import Path
 import tempfile
+import platform_paths
 
 HISTORY = '_pgddl_runner'
 
@@ -142,9 +143,9 @@ def render(data,s,identity,validation=None):
     return '<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PG DDL Runner — auditoria</title><style>body{font:15px system-ui,sans-serif;color:#172334;background:#f3f6fa;max-width:1400px;margin:30px auto;padding:0 18px}h1,h2{color:#17456a}table{border-collapse:collapse;width:100%;background:white;margin:12px 0 26px;table-layout:auto}td,th{border:1px solid #d6e0e9;padding:8px;text-align:left;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere}th{background:#e1eaf2}tr:nth-child(even){background:#f6f9fb}p{max-width:100ch}</style><body>'+''.join(sections)+'</body></html>'
 
 def write_report(content, directory=None):
-    root=Path(directory or (Path(os.environ.get('XDG_STATE_HOME',str(Path.home()/'.local/state')))/'pgddl'/'reports'))
+    root=Path(directory or (platform_paths.state_root()/'reports'))
     root.mkdir(mode=0o700,parents=True,exist_ok=True)
-    stamp=datetime.datetime.now().astimezone().strftime('%d-%m-%Y_%H:%M')
+    stamp=platform_paths.timestamp_part()
     fd,name=tempfile.mkstemp(prefix=stamp+'_',suffix='_pgddl.html',dir=root)
     try:
         with os.fdopen(fd,'w',encoding='utf-8') as f: f.write(content); f.flush(); os.fsync(f.fileno())
